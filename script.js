@@ -1,165 +1,163 @@
 "use strict";
-let canvas = document.getElementById("gameCanvas");
-let ctx = canvas.getContext("2d");
-let scoreDisplay = document.getElementById("score");
-let highScoreDisplay = document.getElementById("highScore");
-let playAgainBtn = document.getElementById("playAgainBtn");
-
-let bw = 300;
-let bh = 150;
-const gridUnit = 10;
-
-let food = {
-  x: Math.floor((Math.random() * bw) / gridUnit) * gridUnit,
-  y: Math.floor((Math.random() * bh) / gridUnit) * gridUnit,
-};
-
-let snake = [
-  { x: 5 * gridUnit, y: 5 * gridUnit },
-  { x: 5 * gridUnit, y: 5 * gridUnit },
-  { x: 5 * gridUnit, y: 5 * gridUnit },
-  { x: 5 * gridUnit, y: 5 * gridUnit },
-];
-let snakeX = snake[0].x;
-let snakeY = snake[0].y;
-
-let snakeDirection;
+const WIDTH = 300;
+const HEIGHT = 150;
+const GRID_UNIT = 10;
 
 let score = 0;
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const scoreDisplay = document.getElementById("score");
+const highScoreDisplay = document.getElementById("highScore");
+
 let highScore = localStorage.getItem("highScore");
 
-playAgainBtn.addEventListener("click", () => {
-  document.location.reload();
-});
+let food = {
+  x: Math.floor((Math.random() * WIDTH) / GRID_UNIT) * GRID_UNIT,
+  y: Math.floor((Math.random() * HEIGHT) / GRID_UNIT) * GRID_UNIT,
+};
 
-document.addEventListener("keydown", keyDownHandler, false);
+let snake = {
+  body: [
+    { x: 5 * GRID_UNIT, y: 5 * GRID_UNIT },
+    { x: 5 * GRID_UNIT, y: 5 * GRID_UNIT },
+    { x: 5 * GRID_UNIT, y: 5 * GRID_UNIT },
+    { x: 5 * GRID_UNIT, y: 5 * GRID_UNIT },
+  ],
+  direction: null,
+};
 
+setInterval(gamePlay, 1000 / GRID_UNIT);
+
+const playAgainBtn = document.getElementById("playAgainBtn");
+playAgainBtn.addEventListener("click", () => document.location.reload());
+
+document.addEventListener("keydown", keyDownHandler);
 function keyDownHandler(e) {
-  if (e.key == "ArrowRight" && snakeDirection != "left") {
-    snakeDirection = "right";
-  } else if (e.key == "ArrowLeft" && snakeDirection != "right") {
-    snakeDirection = "left";
-  } else if (e.key == "ArrowUp" && snakeDirection != "down") {
-    snakeDirection = "up";
-  } else if (e.key == "ArrowDown" && snakeDirection != "up") {
-    snakeDirection = "down";
-  } else if (e.key == "Enter") {
-    document.location.reload();
+  switch (e.key) {
+    case "ArrowRight":
+      if (snake.direction !== "left") snake.direction = "right";
+      break;
+    case "ArrowLeft":
+      if (snake.direction !== "right") snake.direction = "left";
+      break;
+    case "ArrowUp":
+      if (snake.direction !== "down") snake.direction = "up";
+      break;
+    case "ArrowDown":
+      if (snake.direction !== "up") snake.direction = "down";
+      break;
+    case "Enter":
+      document.location.reload();
+      break;
   }
   document.querySelector(".gameInstructionsModal").classList.add("hidden");
 }
 
-window.onload = function () {
-  let framesPerSecond = 8;
-  setInterval(function () {
-    drawEverything();
-    moveEverything();
-    if (boundaryDetection()) {
-      gameOver();
-    }
-    scoreDisplay.textContent = `Score ${score}`;
-    if (highScore) {
-      highScoreDisplay.textContent = `High Score ${highScore}`;
-    }
-  }, 1000 / framesPerSecond);
-};
-
-function drawBoard() {
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = "rgb(2, 7, 159)";
-  for (let x = 0; x < bw; x += gridUnit) {
-    for (let y = 0; y < bh; y += gridUnit) {
-      ctx.strokeRect(x, y, gridUnit, gridUnit);
-    }
-  }
-}
-function drawSnake() {
-  for (let i = 0; i < snake.length; i++) {
-    ctx.fillStyle = "lightgreen";
-    ctx.fillRect(snake[i].x, snake[i].y, gridUnit, gridUnit);
-    ctx.strokeStyle = "black";
-    ctx.strokeRect(snake[i].x, snake[i].y, gridUnit, gridUnit);
-    if (boundaryDetection()) {
-      ctx.fillStyle = "red";
-      ctx.fillRect(snake[i].x, snake[i].y, gridUnit, gridUnit);
-    }
-  }
-}
-
-function drawFood() {
-  ctx.fillStyle = "red";
-  ctx.fillRect(food.x, food.y, gridUnit, gridUnit);
+function gamePlay() {
+  drawEverything();
+  moveEverything();
+  if (boundaryDetection()) gameOver();
+  updateScore();
 }
 
 function drawEverything() {
   ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, bw, bh);
-  drawBoard();
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
   drawSnake();
   drawFood();
 }
 
 function moveEverything() {
   if (!boundaryDetection()) {
-    if (snakeDirection == "right") {
-      snakeX += gridUnit;
-    } else if (snakeDirection == "left") {
-      snakeX -= gridUnit;
-    } else if (snakeDirection == "up") {
-      snakeY -= gridUnit;
-    } else if (snakeDirection == "down") {
-      snakeY += gridUnit;
+    switch (snake.direction) {
+      case "right":
+        snake.body[0].x += GRID_UNIT;
+        break;
+      case "left":
+        snake.body[0].x -= GRID_UNIT;
+        break;
+      case "up":
+        snake.body[0].y -= GRID_UNIT;
+        break;
+      case "down":
+        snake.body[0].y += GRID_UNIT;
+        break;
     }
-    snake.pop();
-    let snakeHead = {
-      x: snakeX,
-      y: snakeY,
-    };
-    snake.unshift(snakeHead);
+    snake.body.pop();
 
-    if (snakeX == food.x && snakeY == food.y) {
+    addSnakePiece();
+
+    if (snakeEatsFood()) {
       score++;
-      snake.unshift(snakeHead);
-      food = {
-        x: Math.floor((Math.random() * bw) / gridUnit) * gridUnit,
-        y: Math.floor((Math.random() * bh) / gridUnit) * gridUnit,
-      };
+      addSnakePiece();
+      resetFood();
     }
   }
 }
 
 function boundaryDetection() {
-  if (
-    snakeX > bw - gridUnit ||
-    snakeX < 0 ||
-    snakeY > bh - gridUnit ||
-    snakeY < 0
-  ) {
-    return true;
-  }
-  for (let i = 4; i < snake.length; i++) {
-    if (snakeDirection && snake[i].x === snakeX && snake[i].y === snakeY)
-      return true;
-  }
+  return (
+    snake.body[0].x > WIDTH - GRID_UNIT ||
+    snake.body[0].x < 0 ||
+    snake.body[0].y > HEIGHT - GRID_UNIT ||
+    snake.body[0].y < 0
+  );
 }
 
 function gameOver() {
+  const newBest = document.querySelector(".newBest");
   document.querySelector(".gameOverModal").classList.remove("hidden");
 
   document.body.classList.add("noscroll");
 
-  if (highScore !== null) {
+  if (highScore) {
     if (score > highScore) {
       localStorage.setItem("highScore", score);
-      document.querySelector(
-        ".newBest"
-      ).textContent = `CONGRATULATIONS! \n NEW HIGH SCORE: \n ${score}`;
-      document.querySelector(".newBest").classList.remove("hidden");
+      newBest.textContent = `CONGRATULATIONS! \n NEW HIGH SCORE: \n ${score}`;
+      newBest.classList.remove("hidden");
       document.querySelector(".trophy").classList.remove("hidden");
     }
   } else {
     localStorage.setItem("highScore", score);
   }
-  if (score > highScore) {
+}
+
+function updateScore() {
+  scoreDisplay.textContent = `Score ${score}`;
+  highScore ? (highScoreDisplay.textContent = `High Score ${highScore}`) : null;
+}
+
+function drawSnake() {
+  for (let i = 0; i < snake.body.length; i++) {
+    ctx.fillStyle = "lightgreen";
+    ctx.fillRect(snake.body[i].x, snake.body[i].y, GRID_UNIT, GRID_UNIT);
+    ctx.strokeStyle = "black";
+    ctx.strokeRect(snake.body[i].x, snake.body[i].y, GRID_UNIT, GRID_UNIT);
+    if (boundaryDetection()) {
+      ctx.fillStyle = "red";
+      ctx.fillRect(snake.body[i].x, snake.body[i].y, GRID_UNIT, GRID_UNIT);
+    }
   }
+}
+
+function drawFood() {
+  ctx.fillStyle = "red";
+  ctx.fillRect(food.x, food.y, GRID_UNIT, GRID_UNIT);
+}
+
+function addSnakePiece() {
+  return snake.body.unshift({ x: snake.body[0].x, y: snake.body[0].y });
+}
+
+function snakeEatsFood() {
+  return snake.body[0].x === food.x && snake.body[0].y === food.y;
+}
+
+function resetFood() {
+  food = {
+    x: Math.floor((Math.random() * WIDTH) / GRID_UNIT) * GRID_UNIT,
+    y: Math.floor((Math.random() * HEIGHT) / GRID_UNIT) * GRID_UNIT,
+  };
 }
